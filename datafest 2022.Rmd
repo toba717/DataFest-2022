@@ -1,0 +1,661 @@
+---
+title: "datafest"
+author: "Takao"
+date: "4/30/2022"
+output:
+  html_document: default
+  pdf_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+We are given a large, unstructured data set from an unreleased game. 
+The game can be played on
+https://user.p2p-games.org/login
+with the login of 
+USERNAME: DATAFEST-77
+PASSWORD: 68uNyNfm
+It is basically a simulation game which provides awareness to sexually transmitted diseases. The user is given choices and can go along the main character's life. The character's life depends upon the selection the users make. In total, there are 9 levels and on the way, there are many mini games that are also free choice to the users. 
+Our goal as a data scientist is to utilize this unstructured data to draw conclusions and insights. What we base the conclusion on is up to the data scientists and further, we want to specify further investigation methods such as what the game development can do better to best promote their awareness message.
+
+
+Our team decided to look into the user's priorities or the main selections that they made in the game. We firmly believed that the conclusion that we draw specializing in this section can provide insights to the specific user and on a larger scale, the same age community of the user. We will deeply analyze the specific priorities that they have and what they value the most depending on the age and gender that they have selected. 
+
+```{r cars}
+library(tidyverse)
+library(dplyr)
+library(tidyr)
+
+mydata <- read_csv("/Users/takaooba/Downloads/logs.csv",guess_max=2156600)
+```
+Make the Data set smaller
+```{r}
+logs <- mydata[,-c(13,29:32,42,54,55,85,97:104)]
+```
+
+The parameter priority_type_that_went_to_zero indicates how much they cared about certain parameters. If the number is greater, they care about it less
+```{r}
+zero_priority <- data.frame(logs$priority_type_that_went_to_zero)
+zero_priority <- zero_priority[!is.na(zero_priority)]
+```
+
+The number indicated in the parameter "PriorityData_type" showcases the specific categories such as health, money, school, etc
+```{r}
+zero_priority[zero_priority=='PriorityData_type:0]'] <- 'Health'
+zero_priority[zero_priority=='PriorityData_type:1]'] <- 'Money'
+zero_priority[zero_priority=='PriorityData_type:2]'] <- 'School'
+zero_priority[zero_priority=='PriorityData_type:3]'] <- 'Friends'
+zero_priority[zero_priority=='PriorityData_type:4]'] <- 'Happiness'
+zero_priority[zero_priority=='PriorityData_type:5]'] <- 'Family'
+
+
+```
+
+This function shows the corresponding numbers of each respected parameters (similar to table() function)
+```{r}
+aggregate(zero_priority, by=list(zero_priority), length)
+```
+
+818 indicates when they won, and 800 indicates when they started, 812 indicates when they lost
+```{r}
+priority_game <- data.frame(logs$player_id[logs$event_id=='818'| logs$event_id=='812'],logs$event_id[logs$event_id=='818'| logs$event_id=='812'])
+
+```
+
+Changing the name of the columns
+```{r}
+names(priority_game)[1] <- 'Player ID'
+names(priority_game)[2] <- 'Win or Lose'
+```
+
+602 Indiciates confirming age and gender
+```{r}
+test <- data.frame(logs$player_id[logs$event_id=='602'], logs$avatar_age[logs$event_id=='602'],logs$avatar_gender[logs$event_id=='602'])
+```
+
+Changing the column name again
+```{r}
+names(test)[1] <- 'Player ID'
+names(test)[2] <- 'Age'
+names(test)[3] <- 'Gender'
+```
+
+Counting how many times they lost
+```{r}
+lose <- aggregate(cbind(logs$event_id[logs$event_id=='812'])~player_id[logs$event_id=='812'], data=logs, length)
+names(lose)[1] <- 'Player ID'
+names(lose)[2] <- 'Lose Count'
+```
+
+Counting how many times they won
+```{r}
+win <- aggregate(cbind(logs$event_id[logs$event_id=='818'])~player_id[logs$event_id=='818'], data=logs, length)
+names(win)[1] <- 'Player ID'
+names(win)[2] <- 'Win Count'
+```
+
+```{r}
+test <- merge(x=test,y=lose,by='Player ID', all.x = TRUE)
+```
+
+```{r}
+test <- merge(x=test,y=win,by='Player ID', all.x=TRUE)
+```
+
+Making a data frame of the category that made the player lose, including the Player ID as well
+```{r}
+lose_type <-data.frame(logs$player_id[logs$event_id=='812'],logs$priority_type_that_went_to_zero[logs$event_id == '812'])
+names(lose_type)[1] <- 'Player ID'
+names(lose_type)[2] <- 'Priority Type'
+lose_type[lose_type=='PriorityData_type:0]'] <- 'Health'
+lose_type[lose_type=='PriorityData_type:1]'] <- 'Money'
+lose_type[lose_type=='PriorityData_type:2]'] <- 'School'
+lose_type[lose_type=='PriorityData_type:3]'] <- 'Friends'
+lose_type[lose_type=='PriorityData_type:4]'] <- 'Happiness'
+lose_type[lose_type=='PriorityData_type:5]'] <- 'Family'
+
+
+```
+
+Organizing the data frame to count the times the priority type lost a player
+```{r}
+#aggregate(lose_type,by=list(lose_type),length)
+
+wer <- as.data.frame(table(lose_type$`Player ID`,lose_type$`Priority Type`))
+
+wer$Family <- wer$Freq[wer$Var2=='Family']
+wer$Friends <- wer$Freq[wer$Var2=='Friends']
+wer$Health <- wer$Freq[wer$Var2 == 'Health']
+wer$Money <- wer$Freq[wer$Var2 == 'Money']
+wer$School <- wer$Freq[wer$Var2 == 'School']
+wer$Happiness <- wer$Freq[wer$Var2=='Happiness']
+wer <- wer[-c(2,3)]
+```
+
+Changing the Name again
+```{r}
+L <- unique(wer)
+names(L)[1] <- 'Player ID'
+```
+
+
+```{r}
+test <- merge(x=test,y=L,by='Player ID',all.x = TRUE)
+```
+
+```{r}
+player <- as.data.frame(unique(logs$player_id))
+names(player)[1] <- 'Player ID'
+# test1 <- merge(x=player,y=test1, by='Player ID',all.x=TRUE)
+```
+
+```{r}
+test[is.na(test)] <- 0
+```
+
+
+Find the frequencies and seeing which ones are unique and have duplicates
+```{r}
+n_occur <- data.frame(table(test$`Player ID`))
+n_occur[n_occur$Freq > 1,]
+
+duplicate <-test[test$`Player ID` %in% n_occur$Var1[n_occur$Freq > 1],]
+unique(duplicate$`Player ID` )
+
+test$number <- c(1:length(test$`Player ID`))
+```
+
+Remove the duplicates
+```{r}
+remove <- test$number[test$`Player ID`== 6430003 | test$`Player ID` == 6506005 | test$`Player ID` == 6546011 | test$`Player ID`==6567003 | test$`Player ID`==6567004 | test$`Player ID`==6606010]
+remove
+
+test1 <- test[-remove,]
+```
+
+Utilize dplyr and summarize the wincount and lose count
+```{r}
+wincount <- test1%>%group_by(Age,Gender)%>%summarize(`Win Count` = sum(`Win Count`))
+losecount <- test1%>%group_by(Age,Gender)%>%summarize(`Lose Count` = sum(`Lose Count`))
+
+
+(wincount$`Win Count`+ losecount$`Lose Count`)/sum(wincount$`Win Count`+ losecount$`Lose Count`)
+
+comparison <- wincount 
+
+comparison$`Total` <- (wincount$`Win Count`+ losecount$`Lose Count`)
+
+comparison$`Success Rate` <- comparison$`Win Count`/comparison$Total
+
+comparison
+```
+
+The following is a summary table with the model.
+There is insignificance, and the multiple R-squared is small
+```{r}
+summary(lm(`Success Rate`~ `Age`*`Gender`,data = comparison))
+```
+
+Solvee for all gender and age combination 
+```{r}
+elevenF <- test1 %>% filter(Age == "11", Gender == "Female")
+elevenF_fam <- sum(elevenF$Family) / sum(elevenF$`Lose Count`)
+elevenF_Health <- sum(elevenF$Health) / sum(elevenF$`Lose Count`)
+elevenF_Money <- sum(elevenF$Money) / sum(elevenF$`Lose Count`)
+elevenF_School <- sum(elevenF$School) / sum(elevenF$`Lose Count`)
+elevenF_Friends <- sum(elevenF$Friends) / sum(elevenF$`Lose Count`)
+elevenF_Happiness <- sum(elevenF$Happiness) / sum(elevenF$`Lose Count`)
+elevenF_mat <- cbind("Family" = elevenF_fam, "Friends" = elevenF_Friends, 
+                     "Happiness" = elevenF_Happiness, "Health" = elevenF_Health, 
+                      "Money" = elevenF_Money, "School" = elevenF_School)
+#barplot(elevenF_mat)
+
+elevenF_mat <- as.data.frame(elevenF_mat)
+elevenF_mat$Group <- '11F'
+```
+
+```{r}
+elevenM <- test1 %>% filter(Age == "11", Gender == "Male")
+elevenM_fam <- sum(elevenM$Family) / sum(elevenM$`Lose Count`)
+elevenM_Health <- sum(elevenM$Health) / sum(elevenM$`Lose Count`)
+elevenM_Money <- sum(elevenM$Money) / sum(elevenM$`Lose Count`)
+elevenM_School <- sum(elevenM$School) / sum(elevenM$`Lose Count`)
+elevenM_Friends <- sum(elevenM$Friends) / sum(elevenM$`Lose Count`)
+elevenM_Happiness <- sum(elevenM$Happiness) / sum(elevenM$`Lose Count`)
+elevenM_mat <- cbind("Family" = elevenM_fam, "Friends" = elevenM_Friends, 
+                     "Happiness" = elevenM_Happiness, "Health" = elevenM_Health, 
+                      "Money" = elevenM_Money, "School" = elevenM_School)
+#barplot(elevenM_mat)
+
+elevenM_mat<-as.data.frame(elevenM_mat)
+elevenM_mat$Group <- '11M'
+
+```
+
+
+```{r}
+twelveF <- test1 %>% filter(Age == "12", Gender == "Female")
+twelveF_fam <- sum(twelveF$Family) / sum(twelveF$`Lose Count`)
+twelveF_Health <- sum(twelveF$Health) / sum(twelveF$`Lose Count`)
+twelveF_Money <- sum(twelveF$Money) / sum(twelveF$`Lose Count`)
+twelveF_School <- sum(twelveF$School) / sum(twelveF$`Lose Count`)
+twelveF_Friends <- sum(twelveF$Friends) / sum(twelveF$`Lose Count`)
+twelveF_Happiness <- sum(twelveF$Happiness) / sum(twelveF$`Lose Count`)
+twelveF_mat <- cbind("Family" = twelveF_fam, "Friends" = twelveF_Friends, 
+                     "Happiness" = twelveF_Happiness, "Health" = twelveF_Health, 
+                      "Money" = twelveF_Money, "School" = twelveF_School)
+twelveF_mat <- as.data.frame((twelveF_mat))
+twelveF_mat$Group <- '12F'
+#barplot(twelveF_mat)
+```
+
+```{r}
+twelveM <- test1 %>% filter(Age == "12", Gender == "Male")
+twelveM_fam <- sum(twelveM$Family) / sum(twelveM$`Lose Count`)
+twelveM_Health <- sum(twelveM$Health) / sum(twelveM$`Lose Count`)
+twelveM_Money <- sum(twelveM$Money) / sum(twelveM$`Lose Count`)
+twelveM_School <- sum(twelveM$School) / sum(twelveM$`Lose Count`)
+twelveM_Friends <- sum(twelveM$Friends) / sum(twelveM$`Lose Count`)
+twelveM_Happiness <- sum(twelveM$Happiness) / sum(twelveM$`Lose Count`)
+twelveM_mat <- cbind("Family" = twelveM_fam, "Friends" = twelveM_Friends, 
+                     "Happiness" = twelveM_Happiness, "Health" = twelveM_Health, 
+                      "Money" = twelveM_Money, "School" = twelveM_School)
+
+twelveM_mat <- as.data.frame(twelveM_mat)
+twelveM_mat$Group <- '12M' 
+#barplot(twelveM_mat)
+```
+
+```{r}
+thirteenF <- test1 %>% filter(Age == "13", Gender == "Female")
+thirteenF_fam <- sum(thirteenF$Family) / sum(thirteenF$`Lose Count`)
+thirteenF_Health <- sum(thirteenF$Health) / sum(thirteenF$`Lose Count`)
+thirteenF_Money <- sum(thirteenF$Money) / sum(thirteenF$`Lose Count`)
+thirteenF_School <- sum(thirteenF$School) / sum(thirteenF$`Lose Count`)
+thirteenF_Friends <- sum(thirteenF$Friends) / sum(thirteenF$`Lose Count`)
+thirteenF_Happiness <- sum(thirteenF$Happiness) / sum(thirteenF$`Lose Count`)
+thirteenF_mat <- cbind("Family" = thirteenF_fam, "Friends" = thirteenF_Friends, 
+                     "Happiness" = thirteenF_Happiness, "Health" = thirteenF_Health, 
+                      "Money" = thirteenF_Money, "School" = thirteenF_School)
+
+thirteenF_mat <- as.data.frame(thirteenF_mat)
+thirteenF_mat$Group <- '13F' 
+```
+
+```{r}
+thirteenM <- test1 %>% filter(Age == "13", Gender == "Male")
+thirteenM_fam <- sum(thirteenM$Family) / sum(thirteenM$`Lose Count`)
+thirteenM_Health <- sum(thirteenM$Health) / sum(thirteenM$`Lose Count`)
+thirteenM_Money <- sum(thirteenM$Money) / sum(thirteenM$`Lose Count`)
+thirteenM_School <- sum(thirteenM$School) / sum(thirteenM$`Lose Count`)
+thirteenM_Friends <- sum(thirteenM$Friends) / sum(thirteenM$`Lose Count`)
+thirteenM_Happiness <- sum(thirteenM$Happiness) / sum(thirteenM$`Lose Count`)
+thirteenM_mat <- cbind("Family" = thirteenM_fam, "Friends" = thirteenM_Friends, 
+                     "Happiness" = thirteenM_Happiness, "Health" = thirteenM_Health, 
+                      "Money" = thirteenM_Money, "School" = thirteenM_School)
+
+thirteenM_mat <- as.data.frame(thirteenM_mat)
+thirteenM_mat$Group <- '13M'
+```
+
+```{r}
+fourteenF <- test1 %>% filter(Age == "14", Gender == "Female")
+fourteenF_fam <- sum(fourteenF$Family) / sum(fourteenF$`Lose Count`)
+fourteenF_Health <- sum(fourteenF$Health) / sum(fourteenF$`Lose Count`)
+fourteenF_Money <- sum(fourteenF$Money) / sum(fourteenF$`Lose Count`)
+fourteenF_School <- sum(fourteenF$School) / sum(fourteenF$`Lose Count`)
+fourteenF_Friends <- sum(fourteenF$Friends) / sum(fourteenF$`Lose Count`)
+fourteenF_Happiness <- sum(fourteenF$Happiness) / sum(fourteenF$`Lose Count`)
+fourteenF_mat <- cbind("Family" = fourteenF_fam, "Friends" = fourteenF_Friends, 
+                     "Happiness" = fourteenF_Happiness, "Health" = fourteenF_Health, 
+                      "Money" = fourteenF_Money, "School" = fourteenF_School)
+
+fourteenF_mat <- as.data.frame(fourteenF_mat)
+fourteenF_mat$Group <- '14F' 
+```
+
+```{r}
+fourteenM <- test1 %>% filter(Age == "14", Gender == "Male")
+fourteenM_fam <- sum(fourteenM$Family) / sum(fourteenM$`Lose Count`)
+fourteenM_Health <- sum(fourteenM$Health) / sum(fourteenM$`Lose Count`)
+fourteenM_Money <- sum(fourteenM$Money) / sum(fourteenM$`Lose Count`)
+fourteenM_School <- sum(fourteenM$School) / sum(fourteenM$`Lose Count`)
+fourteenM_Friends <- sum(fourteenM$Friends) / sum(fourteenM$`Lose Count`)
+fourteenM_Happiness <- sum(fourteenM$Happiness) / sum(fourteenM$`Lose Count`)
+fourteenM_mat <- cbind("Family" = fourteenM_fam, "Friends" = fourteenM_Friends, 
+                     "Happiness" = fourteenM_Happiness, "Health" = fourteenM_Health, 
+                      "Money" = fourteenM_Money, "School" = fourteenM_School)
+
+fourteenM_mat <- as.data.frame(fourteenM_mat)
+fourteenM_mat$Group <- '14M'
+```
+
+
+Building a barplot, we have that 
+```{r}
+library(ggplot2)
+bar <- as.data.frame(rbind(elevenM_mat, elevenF_mat, twelveM_mat,twelveF_mat,thirteenM_mat, thirteenF_mat,fourteenM_mat,fourteenF_mat))
+barplot(as.matrix(bar))
+```
+
+
+
+
+```{r}
+elevenF <- test1 %>% filter(Age == "11", Gender == "Female")
+elevenF_fam <- sum(elevenF$Family) 
+elevenF_Health <- sum(elevenF$Health)
+elevenF_Money <- sum(elevenF$Money) 
+elevenF_School <- sum(elevenF$School) 
+elevenF_Friends <- sum(elevenF$Friends) 
+elevenF_Happiness <- sum(elevenF$Happiness) 
+elevenF_mat <- cbind("Family" = elevenF_fam, "Friends" = elevenF_Friends, 
+                     "Happiness" = elevenF_Happiness, "Health" = elevenF_Health, 
+                      "Money" = elevenF_Money, "School" = elevenF_School)
+#barplot(elevenF_mat)
+
+#elevenF_mat <- as.data.frame(elevenF_mat)
+#elevenF_mat$Group <- '11F'
+
+
+```
+
+```{r}
+elevenM <- test1 %>% filter(Age == "11", Gender == "Male")
+elevenM_fam <- sum(elevenM$Family) 
+elevenM_Health <- sum(elevenM$Health) 
+elevenM_Money <- sum(elevenM$Money) 
+elevenM_School <- sum(elevenM$School) 
+elevenM_Friends <- sum(elevenM$Friends)
+elevenM_Happiness <- sum(elevenM$Happiness)
+elevenM_mat <- cbind("Family" = elevenM_fam, "Friends" = elevenM_Friends, 
+                     "Happiness" = elevenM_Happiness, "Health" = elevenM_Health, 
+                      "Money" = elevenM_Money, "School" = elevenM_School)
+#barplot(elevenM_mat)
+
+#elevenM_mat<-as.data.frame(elevenM_mat)
+#elevenM_mat$Group <- '11M'
+
+```
+
+
+```{r}
+twelveF <- test1 %>% filter(Age == "12", Gender == "Female")
+twelveF_fam <- sum(twelveF$Family)
+twelveF_Health <- sum(twelveF$Health)
+twelveF_Money <- sum(twelveF$Money) 
+twelveF_School <- sum(twelveF$School) 
+twelveF_Friends <- sum(twelveF$Friends)
+twelveF_Happiness <- sum(twelveF$Happiness) 
+twelveF_mat <- cbind("Family" = twelveF_fam, "Friends" = twelveF_Friends, 
+                     "Happiness" = twelveF_Happiness, "Health" = twelveF_Health, 
+                      "Money" = twelveF_Money, "School" = twelveF_School)
+#twelveF_mat <- as.data.frame((twelveF_mat))
+#twelveF_mat$Group <- '12F'
+#barplot(twelveF_mat)
+```
+
+```{r}
+twelveM <- test1 %>% filter(Age == "12", Gender == "Male")
+twelveM_fam <- sum(twelveM$Family) 
+twelveM_Health <- sum(twelveM$Health)
+twelveM_Money <- sum(twelveM$Money) 
+twelveM_School <- sum(twelveM$School) 
+twelveM_Friends <- sum(twelveM$Friends) 
+twelveM_Happiness <- sum(twelveM$Happiness) 
+twelveM_mat <- cbind("Family" = twelveM_fam, "Friends" = twelveM_Friends, 
+                     "Happiness" = twelveM_Happiness, "Health" = twelveM_Health, 
+                      "Money" = twelveM_Money, "School" = twelveM_School)
+
+#twelveM_mat <- as.data.frame(twelveM_mat)
+#twelveM_mat$Group <- '12M' 
+#barplot(twelveM_mat)
+```
+
+```{r}
+thirteenF <- test1 %>% filter(Age == "13", Gender == "Female")
+thirteenF_fam <- sum(thirteenF$Family) 
+thirteenF_Health <- sum(thirteenF$Health)
+thirteenF_Money <- sum(thirteenF$Money)
+thirteenF_School <- sum(thirteenF$School) 
+thirteenF_Friends <- sum(thirteenF$Friends)
+thirteenF_Happiness <- sum(thirteenF$Happiness)
+thirteenF_mat <- cbind("Family" = thirteenF_fam, "Friends" = thirteenF_Friends, 
+                     "Happiness" = thirteenF_Happiness, "Health" = thirteenF_Health, 
+                      "Money" = thirteenF_Money, "School" = thirteenF_School)
+
+#thirteenF_mat <- as.data.frame(thirteenF_mat)
+#thirteenF_mat$Group <- '13F' 
+```
+
+```{r}
+thirteenM <- test1 %>% filter(Age == "13", Gender == "Male")
+thirteenM_fam <- sum(thirteenM$Family) 
+thirteenM_Health <- sum(thirteenM$Health) 
+thirteenM_Money <- sum(thirteenM$Money) 
+thirteenM_School <- sum(thirteenM$School) 
+thirteenM_Friends <- sum(thirteenM$Friends)
+thirteenM_Happiness <- sum(thirteenM$Happiness)
+thirteenM_mat <- cbind("Family" = thirteenM_fam, "Friends" = thirteenM_Friends, 
+                     "Happiness" = thirteenM_Happiness, "Health" = thirteenM_Health, 
+                      "Money" = thirteenM_Money, "School" = thirteenM_School)
+
+#thirteenM_mat <- as.data.frame(thirteenM_mat)
+#thirteenM_mat$Group <- '13M'
+```
+
+```{r}
+fourteenF <- test1 %>% filter(Age == "14", Gender == "Female")
+fourteenF_fam <- sum(fourteenF$Family) 
+fourteenF_Health <- sum(fourteenF$Health) 
+fourteenF_Money <- sum(fourteenF$Money) 
+fourteenF_School <- sum(fourteenF$School) 
+fourteenF_Friends <- sum(fourteenF$Friends) 
+fourteenF_Happiness <- sum(fourteenF$Happiness) 
+fourteenF_mat <- cbind("Family" = fourteenF_fam, "Friends" = fourteenF_Friends, 
+                     "Happiness" = fourteenF_Happiness, "Health" = fourteenF_Health, 
+                      "Money" = fourteenF_Money, "School" = fourteenF_School)
+
+#fourteenF_mat <- as.data.frame(fourteenF_mat)
+#fourteenF_mat$Group <- '14F' 
+```
+
+```{r}
+fourteenM <- test1 %>% filter(Age == "14", Gender == "Male")
+fourteenM_fam <- sum(fourteenM$Family) 
+fourteenM_Health <- sum(fourteenM$Health) 
+fourteenM_Money <- sum(fourteenM$Money) 
+fourteenM_School <- sum(fourteenM$School) 
+fourteenM_Friends <- sum(fourteenM$Friends) 
+fourteenM_Happiness <- sum(fourteenM$Happiness) 
+fourteenM_mat <- cbind("Family" = fourteenM_fam, "Friends" = fourteenM_Friends, 
+                     "Happiness" = fourteenM_Happiness, "Health" = fourteenM_Health, 
+                      "Money" = fourteenM_Money, "School" = fourteenM_School)
+
+#fourteenM_mat <- as.data.frame(fourteenM_mat)
+#fourteenM_mat$Group <- '14M'
+```
+
+
+
+```{r}
+specie <- c(rep("11M",6),rep("11F",6),rep("12M",6),rep("12F",6),rep("13M",6),rep("13F",6),rep("14M",6),rep("14F",6))
+condition <- rep(c("Family","Friends","Happiness","Health","Money","School"),4)
+value <- c(elevenM_mat,elevenF_mat,twelveM_mat,twelveF_mat,thirteenM_mat,thirteenF_mat, fourteenM_mat, fourteenF_mat)
+data <- data.frame(specie,condition,value)
+```
+
+
+This gives the segmented bar graph with the Age and gender groups on the x-axis and the corresponding proportions on the y-axis
+```{r}
+ggplot(data, aes(fill=condition, y=value, x=specie)) + 
+    geom_bar(position="fill", stat="identity") + xlab("Age & Gender Group") + ylab("Proportion of Lost Priorities") + labs(fill='Priorities', title="Non-Priorities vs. Age/Gender Group") 
+```
+
+
+We can see how the goal prioroty proportion differs. We will make a barplot with the priorities and their corresponding proportion.
+```{r}
+goal1 <- as.data.frame(logs %>% filter(event_id == 811))
+health <- sum(goal1$goal_1_priority_type == "PriorityData_type:0") + sum(goal1$goal_2_priority_type == "PriorityData_type:0")
+
+money <- sum(goal1$goal_1_priority_type == "PriorityData_type:1")+ sum(goal1$goal_2_priority_type == "PriorityData_type:1")
+
+school <- sum(goal1$goal_1_priority_type == "PriorityData_type:2")+ sum(goal1$goal_2_priority_type == "PriorityData_type:2")
+
+friends <- sum(goal1$goal_1_priority_type == "PriorityData_type:3")+ sum(goal1$goal_2_priority_type == "PriorityData_type:3")
+
+happiness <- sum(goal1$goal_1_priority_type == "PriorityData_type:4")+ sum(goal1$goal_2_priority_type == "PriorityData_type:4")
+
+family <- sum(goal1$goal_1_priority_type == "PriorityData_type:5")+ sum(goal1$goal_2_priority_type == "PriorityData_type:5")
+total <- sum(family, happiness, friends, school, money, health)
+prioritymat <- cbind("family" = family / total, "happiness" = happiness / total, "friends" = friends / total,"school" = school / total, "money" = money / total, "health" = health / total)
+
+barplot(prioritymat, col = c("#69b3a2"), names.arg = c("Family","Happiness","Friends","School","Money","Health"),cex.axis = 1,las=2, ylab = "Proportion", main="Goal Priority Proportion")
+```
+
+
+
+Calculating based on the levels, 
+
+# LV 0 Average
+```{r}
+# tally(c(1, 2, 3))
+logsmod <- logs[,c(2, 7,11)]
+logs[logs$player_id == 6427001 & (logs$event_id==818 | logs$event_id==800 |logs$event_id==812) & logs$minigame_level==0,]
+logsmod0 <- logs[(logs$event_id==818 | logs$event_id==800) & logs$minigame_level==0,]
+logsmod0 <- logsmod0[,c(2,7,11)]
+logsmod0$number <- c(1:length(logsmod0$player_id))
+rows <- which(logsmod0$event_id == 818)
+level0_800 <- rows - 1
+
+lv0_avg<-sum((logsmod0$event_time_dbl[rows]-logsmod0$event_time_dbl[level0_800]))/length(level0_800)
+lv0_avg
+```
+
+# LV 1 Average
+
+```{r}
+logsmod1 <- logs[(logs$event_id==818 | logs$event_id==800) & logs$minigame_level==1,]
+logsmod1 <- logsmod1[,c(2,7,11)]
+logsmod1$number <- c(1:length(logsmod1$player_id))
+rows <- which(logsmod1$event_id == 818)
+level0_800 <- rows - 1
+
+lv1_avg<-sum((logsmod1$event_time_dbl[rows]-logsmod1$event_time_dbl[level0_800]))/length(level0_800)
+lv1_avg
+```
+
+# LV 2 Average
+
+```{r}
+logsmod2 <- logs[(logs$event_id==818 | logs$event_id==800) & logs$minigame_level==2,]
+logsmod2 <- logsmod2[,c(2,7,11)]
+logsmod2$number <- c(1:length(logsmod2$player_id))
+rows <- which(logsmod2$event_id == 818)
+level0_800 <- rows - 1
+
+lv2_avg<-sum((logsmod2$event_time_dbl[rows]-logsmod2$event_time_dbl[level0_800]))/length(level0_800)
+lv2_avg
+
+```
+
+# LV 3 Average 
+
+```{r}
+logsmod3 <- logs[(logs$event_id==818 | logs$event_id==800) & logs$minigame_level==3,]
+logsmod3 <- logsmod3[,c(2,7,11)]
+logsmod3$number <- c(1:length(logsmod3$player_id))
+rows <- which(logsmod3$event_id == 818)
+level0_800 <- rows - 1
+
+lv3_avg<-sum((logsmod3$event_time_dbl[rows]-logsmod3$event_time_dbl[level0_800]))/length(level0_800)
+lv3_avg
+```
+
+# LV 4 Average
+```{r}
+logsmod4 <- logs[(logs$event_id==818 | logs$event_id==800) & logs$minigame_level==4,]
+logsmod4 <- logsmod4[,c(2,7,11)]
+logsmod4$number <- c(1:length(logsmod4$player_id))
+rows <- which(logsmod4$event_id == 818)
+level0_800 <- rows - 1
+
+lv4_avg<-sum((logsmod4$event_time_dbl[rows]-logsmod4$event_time_dbl[level0_800]))/length(level0_800)
+lv4_avg
+```
+
+# LV 5 Average 
+
+```{r}
+logsmod5 <- logs[(logs$event_id==818 | logs$event_id==800) & logs$minigame_level==5,]
+logsmod5 <- logsmod5[,c(2,7,11)]
+logsmod5$number <- c(1:length(logsmod5$player_id))
+rows <- which(logsmod5$event_id == 818)
+level0_800 <- rows - 1
+
+lv5_avg<-sum((logsmod5$event_time_dbl[rows]-logsmod5$event_time_dbl[level0_800]))/length(level0_800)
+lv5_avg
+
+```
+
+# LV 6 Average 
+
+```{r}
+logsmod6 <- logs[(logs$event_id==818 | logs$event_id==800) & logs$minigame_level==6,]
+logsmod6 <- logsmod6[,c(2,7,11)]
+logsmod6$number <- c(1:length(logsmod6$player_id))
+rows <- which(logsmod6$event_id == 818)
+level0_800 <- rows - 1
+
+lv6_avg<-sum((logsmod6$event_time_dbl[rows]-logsmod6$event_time_dbl[level0_800]))/length(level0_800)
+lv6_avg
+```
+
+# LV 7 Average 
+```{r}
+logsmod7 <- logs[(logs$event_id==818 | logs$event_id==800) & logs$minigame_level==7,]
+logsmod7 <- logsmod7[,c(2,7,11)]
+logsmod7$number <- c(1:length(logsmod7$player_id))
+rows <- which(logsmod7$event_id == 818)
+level0_800 <- rows - 1
+
+lv7_avg<-sum((logsmod7$event_time_dbl[rows]-logsmod7$event_time_dbl[level0_800]))/length(level0_800)
+lv7_avg
+```
+
+# LV 8 Average
+```{r}
+logsmod8 <- logs[(logs$event_id==818 | logs$event_id==800) & logs$minigame_level==8,]
+logsmod8 <- logsmod8[,c(2,7,11)]
+logsmod8$number <- c(1:length(logsmod8$player_id))
+rows <- which(logsmod8$event_id == 818)
+level0_800 <- rows - 1
+
+lv8_avg<-sum((logsmod8$event_time_dbl[rows]-logsmod8$event_time_dbl[level0_800]))/length(level0_800)
+lv8_avg
+```
+
+# LV 9 Average
+```{r}
+logsmod9 <- logs[(logs$event_id==818 | logs$event_id==800) & logs$minigame_level==9,]
+logsmod9 <- logsmod9[,c(2,7,11)]
+logsmod9$number <- c(1:length(logsmod9$player_id))
+rows <- which(logsmod9$event_id == 818)
+level0_800 <- rows - 1
+
+lv9_avg<-sum((logsmod9$event_time_dbl[rows]-logsmod9$event_time_dbl[level0_800]))/length(level0_800)
+lv9_avg
+```
+
+# Matrix 
+
+```{r}
+averages <- c(lv0_avg,lv1_avg,lv2_avg,lv3_avg,lv4_avg,lv5_avg,lv6_avg,lv7_avg,lv8_avg,lv9_avg)
+df1 <- data.frame("Levels" = 0:9, "Averages" = averages)
+df1
+plot(Averages ~ Levels, data = df1)
+```
+
+Above is the graph that indicates the average finish time by the various levels
