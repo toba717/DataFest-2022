@@ -6,4 +6,4 @@ The American Statistical Association DataFest 2022
 Team 95% Self-Confident Project
 
 
-Team lead by Takao Oba
+Chosen as Finalist out of 100+ Teams that participated from accross the nation
